@@ -11,8 +11,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 def ddp_setup(rank, world_size):
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12345"
+    os.environ["MASTER_ADDR"] = os.environ.get("MASTER_NODE_NAME", "localhost")
+    os.environ["MASTER_PORT"] = "29500"
 
     if platform.system() == "Windows":
         os.environ["USE_LIBUV"] = 0
@@ -20,6 +20,7 @@ def ddp_setup(rank, world_size):
     else:
         init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
+    torch.cuda.set_device(rank)
 
 # Dataset class
 class ToyDataset(Dataset):
@@ -107,7 +108,7 @@ def main(rank, world_size, num_epoch):
             loss.backward()
             optimizer.step()
 
-            print(f"Epoch {ep+1:03d}/{num_epochs:03d} | batch {idx+1:03d}/{len(train_loader):03d} | train loss: {loss:0.2f}")
+            print(f"Epoch {ep+1:03d}/{num_epoch:03d} | batch {idx+1:03d}/{len(train_loader):03d} | train loss: {loss:0.2f}")
 
     model.eval()
 
@@ -122,6 +123,7 @@ def main(rank, world_size, num_epoch):
             f"You have {torch.cuda.device_count()} GPUs in your environment"
         )
 
+    destroy_process_group()
 
 def compute_accuracy(model, dataloader, device):
     model.eval()
